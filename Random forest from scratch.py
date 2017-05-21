@@ -127,5 +127,85 @@ tree.fit(X=X_train, y=y_train)
 
 y_pred = tree.predict(X=X_test)
 
-accuracy_score(y_test, y_pred)
+decisiontree_accuracy = accuracy_score(y_test, y_pred)
+decisiontree_accuracy
 
+
+# ## Grow a forest
+
+# > a. Continuing the previous excercise, generate 1,000 subsets of the training set, each containing 100 instances selected randomly. Hint: you can use Scikit-Learn's `ShuffleSplit` for this.
+
+
+from sklearn.model_selection import ShuffleSplit
+
+shuffler = ShuffleSplit(n_splits=1000, test_size=0, train_size=100)
+subsets = []
+for train_index, test_index in shuffler.split(X_train):
+    subsets.append((X_train[train_index], y_train[train_index]))
+
+
+# > b. Train on Decision Tree on this subset, using the best hyperparameter values found above. Evaluate these 1,000 Decision Trees on the test set. Since they were trained on smaller sets, these Decision Trees will likely perform worse than the first Decision Tree, achieving only about 80% accuracy.
+# 
+# I need to make a tree for every subset of the data that I've created.
+# 
+# I really like the `tqdm` for anything where I'm iterating over a lot of things.
+# It makes it really easy to put a progress bar in.
+
+
+import tqdm
+trees = []
+for subset in tqdm.tqdm(subsets):
+    tree = DecisionTreeClassifier(max_leaf_nodes=4)
+    tree.fit(subset[0], subset[1])
+    trees.append(tree)    
+
+
+# Now evaluate the accuracy for each of these subtrees against the test dataset,
+# calculating the accuracy score.
+
+
+accuracies = [accuracy_score(y_test, tree.predict(X_test)) for tree in trees]
+
+
+# Indeed it does look like our mean accuracy for each of the subtrees against the test set is poorer than the accuracy of the big decision tree.
+
+
+import numpy as np
+mean_subtree_accuracy = np.mean(accuracies)
+
+print(mean_subtree_accuracy)
+print(decisiontree_accuracy)
+
+plt.hist(accuracies)
+plt.axvline(np.mean(accuracies), color='red')
+plt.axvline(decisiontree_accuracy, color='black');
+
+
+# > c. Now comes the magic. For each test set instance, generate the predictions of the 1,000 Decision Trees, and keep only the most frequent prediction (you can use SciPy's `mode()` function for this). This gives you the _majority-vote predictions_ over the test set.
+
+
+predictions = []
+for tree in trees:
+    prediction = tree.predict(X_test)
+    predictions.append(prediction)
+    
+predictions = np.array(predictions)
+
+
+
+import numpy as np
+from scipy.stats import mode
+majority_vote = mode(np.array(predictions))[0]
+
+
+# > d. Evaluate these predictions on the test set: you should obtain a slightly higher accuracy than your first mode (about 0.5 to 1.5% higher). Congratulations, you have trained a Random Forest classifier!
+
+
+majority_vote_accuracy = accuracy_score(y_test, majority_vote[0, :])
+print(majority_vote_accuracy)
+print(decisiontree_accuracy)
+
+print("Improvement {delta}%".format(delta=(majority_vote_accuracy - decisiontree_accuracy)*100))
+
+
+# It works!
